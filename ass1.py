@@ -1,4 +1,6 @@
 from pyspark import SparkContext, SparkConf
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
 from operator import add
 
 conf=SparkConf().setAppName("main").setMaster("local")
@@ -111,19 +113,74 @@ def highest_rated_artists(artist,album):
 #9
 def average_mtvc_norway_each_artist(artist,album):
     nor_artists=(artist
-                .filter(lambda x: x["country"]=="Norway")
-                .map(lambda x: (x["id"], x["art"] or x["real"],x["country"]))
-                .collect()           
+        .filter(lambda x: x["country"]=="Norway")
+        .map(lambda x: (int(x["id"]), x["art"]))         
     )
-    nor_albums=(album
-                .map(lambda x: (x["aid"], float(x["mtvc"])))
-                .groupBy(lambda x: x[0])
-                .mapValues(list)
-                .map(lambda x: x[1])
-                .flatMap(lambda x:x)
-                .reduceByKey(lambda x: add(x)/len(x))
-                #.join(nor_artists)
-                .take(10)
-                )
-    return nor_albums
+    albums=album.map(lambda x: (int(x["aid"]), float(x["mtvc"])))
+
+    point=albums.join(nor_artists).groupByKey().mapValues(len)
+
+    return(albums
+        .join(nor_artists)
+        .reduceByKey(lambda a,b: (a[0]+b[0],a[1]))
+        .join(point)
+        .map(lambda x: (x[1][0][1], "Norway", x[1][0][0]/x[1][1]))
+        .collect()
+        )
 print(average_mtvc_norway_each_artist(artists,albums))
+
+#10
+SPARK=SparkSession.builder.config(conf=conf).getOrCreate()
+ALBUM_DF=SPARK.createDataFrame(albums)
+ARTISTS_DF=SPARK.createDataFrame(artists)
+
+#a
+def get_dist_art(df):
+    return(df.agg(approx_count_distinct(df.id)
+            .alias("distinct_artists"))
+            .show())
+#b
+def get_dist_alb(df):
+    return(df.agg(approx_count_distinct(df.id)
+            .alias("distinct_albums"))
+            .show())
+#c
+def get_dist_genre(df):
+    return(df.agg(approx_count_distinct(df.genre)
+            .alias("distinct_genres"))
+            .show())
+#d
+def get_dist_country(df):
+    return(df.agg(approx_count_distinct(df.country)
+            .alias("distinct_countries"))
+            .show())
+#e
+def min_year_of_pub(df):
+    return(df.agg(min(df.year)
+            .alias("min_year_of_pub"))
+            .show())
+#f
+def max_year_of_pub(df):
+    return(df.agg(max(df.year)
+            .alias("max_year_of_pub"))
+            .show())
+#g
+def min_year_of_birth(df):
+    return(df.agg(min(df.year)
+            .alias("min_year_of_birth"))
+            .show())
+#h
+def max_year_of_birth(df):
+    return(df.agg(max(df.year)
+            .alias("max_year_of_birth"))
+            .show())
+def task_10():
+    (get_dist_art(ARTISTS_DF))
+    (get_dist_alb(ALBUM_DF))
+    (get_dist_genre(ALBUM_DF))
+    (get_dist_country(ARTISTS_DF))
+    (min_year_of_pub(ALBUM_DF))
+    (max_year_of_pub(ALBUM_DF))
+    (min_year_of_birth(ARTISTS_DF))
+    (max_year_of_birth(ARTISTS_DF))
+#task_10()
