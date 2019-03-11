@@ -77,22 +77,18 @@ def top_albums(rdd):
             )
 #print(top_albums(albums))
 #7
-def findtuple(albumid,ar_cnt,alb_ar):
-    for i in alb_ar:
-        if albumid==i[0]:
-            for j in ar_cnt:
-                if i[1]==j[0]:
-                    return j[1]
-    return "NO COUNTRY"
-def country_of_artist_in_album(topalbum,album,artist):
+def country_of_artist_in_album(album,artist):
     #print(album.filter(lambda x: x["id"] in list(map((lambda x: x[0]), topalbum))).collect())
-    al=album.filter(lambda x: x["id"] in map((lambda x: x[0]), topalbum)).map(lambda x: (x["id"],x["aid"])).collect()
-    #print(al)
-    ar=artist.filter(lambda x: x["id"] in map(lambda x: x[1], al)).map(lambda x: (x["id"], x["country"])).collect()
-    print(ar)
-    return(
-            list(map((lambda x: (x[0],x[1],findtuple(x[0],ar,al))), topalbum)))
-#print(country_of_artist_in_album(top_albums(albums),albums,artists))
+    al=sc.parallelize(album
+        .map(lambda x: (int(x["aid"]), (int(x["id"]), (float(x["rsc"])+float(x["mtvc"])+float(x["mmc"]))/3)))
+        .takeOrdered(10, lambda x: -x[1][1])
+        )
+    ar=artist.map(lambda x: (int(x["id"]), x["country"]))
+    return(al
+        .join(ar)
+        .map(lambda x: (x[1][0][0], x[1][0][1], x[1][1]))
+        .collect())
+#print(country_of_artist_in_album(albums,artists))
 
 #8
 #artists.joi
@@ -127,9 +123,9 @@ def average_mtvc_norway_each_artist(artist,album):
         .map(lambda x: (x[1][0][1], "Norway", x[1][0][0]/x[1][1]))
         .collect()
         )
-print(average_mtvc_norway_each_artist(artists,albums))
+#print(average_mtvc_norway_each_artist(artists,albums))
 
-#10
+# Task 10
 SPARK=SparkSession.builder.config(conf=conf).getOrCreate()
 ALBUM_DF=SPARK.createDataFrame(albums)
 ARTISTS_DF=SPARK.createDataFrame(artists)
